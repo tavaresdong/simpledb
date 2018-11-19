@@ -131,7 +131,7 @@ public class HeapFile implements DbFile {
     }
 
     private class HeapFileIterator implements DbFileIterator {
-
+        private boolean isOpen;
         private final TransactionId tid;
         private int tableId;
         private int pageNo;
@@ -141,26 +141,37 @@ public class HeapFile implements DbFile {
         private Permissions perm;
 
         HeapFileIterator(TransactionId tid) {
+            this.isOpen = false;
             this.tid = tid;
             this.pool = new BufferPool(BufferPool.DEFAULT_PAGES);
             this.perm = Permissions.READ_ONLY;
         }
 
-        @Override
-        public void open() throws DbException, TransactionAbortedException {
-            this.tableId = getId();
+        private void reset() throws DbException, TransactionAbortedException {
             this.pageNo = 0;
-
             this.curPageId = new HeapPageId(this.tableId, pageNo);
             HeapPage curPage = (HeapPage) this.pool.getPage(this.tid, curPageId, this.perm);
             this.pageIterator = curPage.iterator();
         }
 
+
+        @Override
+        public void open() throws DbException, TransactionAbortedException {
+            this.tableId = getId();
+            this.isOpen = true;
+            this.reset();
+        }
+
         @Override
         public boolean hasNext() throws DbException, TransactionAbortedException {
+            if (!this.isOpen) {
+                return false;
+            }
             if (this.pageIterator.hasNext()) {
                 return true;
             } else {
+
+                // Try to load the next page
                 this.pageNo++;
                 if (this.pageNo < numPages()) {
                     this.curPageId = new HeapPageId(this.tableId, pageNo);
@@ -184,15 +195,12 @@ public class HeapFile implements DbFile {
 
         @Override
         public void rewind() throws DbException, TransactionAbortedException {
-            this.pageNo = 0;
-
-            this.curPageId = new HeapPageId(this.tableId, pageNo);
-            HeapPage curPage = (HeapPage) this.pool.getPage(this.tid, curPageId, this.perm);
-            this.pageIterator = curPage.iterator();
+            this.reset();
         }
 
         @Override
         public void close() {
+            this.isOpen = false;
         }
     }
 

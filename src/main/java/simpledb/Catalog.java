@@ -18,12 +18,28 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Catalog {
 
+    private class TableItem {
+        public TableItem(DbFile f, String n, String pk) {
+            this.file = f;
+            this.name = n;
+            this.pKey = pk;
+        }
+
+        DbFile file;
+        String name;
+        String pKey;
+    }
+
+    private Map<String, TableItem> tableNameDict;
+    private Map<Integer, TableItem> tableIdDict;
+
     /**
      * Constructor.
      * Creates a new, empty catalog.
      */
     public Catalog() {
-        // some code goes here
+        this.tableNameDict = new HashMap<>();
+        this.tableIdDict = new HashMap<>();
     }
 
     /**
@@ -36,7 +52,14 @@ public class Catalog {
      * @param pkeyField the name of the primary key field
      */
     public void addTable(DbFile file, String name, String pkeyField) {
-        // some code goes here
+        if (name == null) {
+            throw new IllegalArgumentException("Name of a table cannot be null");
+        }
+
+        int tableId = file.getId();
+        TableItem item = new TableItem(file, name, pkeyField);
+        this.tableNameDict.put(name, item);
+        this.tableIdDict.put(tableId, item);
     }
 
     public void addTable(DbFile file, String name) {
@@ -59,8 +82,12 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public int getTableId(String name) throws NoSuchElementException {
-        // some code goes here
-        return 0;
+        if (!this.tableNameDict.containsKey(name)) {
+            throw new NoSuchElementException("No table with name: " + name);
+        }
+
+        TableItem item = this.tableNameDict.get(name);
+        return item.file.getId();
     }
 
     /**
@@ -70,8 +97,12 @@ public class Catalog {
      * @throws NoSuchElementException if the table doesn't exist
      */
     public TupleDesc getTupleDesc(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        if (!this.tableIdDict.containsKey(tableid)) {
+            throw new NoSuchElementException("No table with name: " + tableid);
+        }
+
+        TableItem item = this.tableIdDict.get(tableid);
+        return item.file.getTupleDesc();
     }
 
     /**
@@ -81,28 +112,64 @@ public class Catalog {
      *     function passed to addTable
      */
     public DbFile getDatabaseFile(int tableid) throws NoSuchElementException {
-        // some code goes here
-        return null;
+        if (!this.tableIdDict.containsKey(tableid)) {
+            throw new NoSuchElementException("No table with name: " + tableid);
+        }
+
+        TableItem item = this.tableIdDict.get(tableid);
+        return item.file;
     }
 
     public String getPrimaryKey(int tableid) {
-        // some code goes here
-        return null;
+        if (!this.tableIdDict.containsKey(tableid)) {
+            throw new NoSuchElementException("No table with name: " + tableid);
+        }
+
+        TableItem item = this.tableIdDict.get(tableid);
+        return item.pKey;
     }
 
     public Iterator<Integer> tableIdIterator() {
-        // some code goes here
-        return null;
+        return new Iterator<Integer>() {
+
+            private int currentIdx = 0;
+            private Integer[] tableIds;
+
+            {
+                tableIds = (Integer[]) tableIdDict.keySet().toArray();
+                currentIdx = tableIds.length;
+            }
+
+            @Override
+            public boolean hasNext() {
+                if (currentIdx < tableIdDict.size()) {
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public Integer next() {
+                Integer value = tableIds[currentIdx];
+                ++currentIdx;
+                return value;
+            }
+        };
     }
 
     public String getTableName(int id) {
-        // some code goes here
-        return null;
+        if (!this.tableIdDict.containsKey(id)) {
+            throw new NoSuchElementException("No table with name: " + id);
+        }
+
+        TableItem item = this.tableIdDict.get(id);
+        return item.name;
     }
     
     /** Delete all tables from the catalog */
     public void clear() {
-        // some code goes here
+        this.tableIdDict.clear();
+        this.tableNameDict.clear();
     }
     
     /**
@@ -111,7 +178,7 @@ public class Catalog {
      */
     public void loadSchema(String catalogFile) {
         String line = "";
-        String baseFolder=new File(new File(catalogFile).getAbsolutePath()).getParent();
+        String baseFolder = new File(new File(catalogFile).getAbsolutePath()).getParent();
         try {
             BufferedReader br = new BufferedReader(new FileReader(new File(catalogFile)));
             

@@ -29,7 +29,7 @@ public class BufferPool {
 
     private final int maxNumPages;
 
-    private final Map<Integer, Page> cachedPages;
+    private final ConcurrentHashMap<PageId, Page> cachedPages;
 
     /**
      * Creates a BufferPool that caches up to numPages pages.
@@ -80,8 +80,9 @@ public class BufferPool {
         if (this.cachedPages.size() == this.maxNumPages) {
             throw new DbException("Maximum number of cached page reached");
         } else {
-            //this.cachedPages.put(pid, )
-            return null;
+            Page page = Database.getCatalog().getDatabaseFile(pid.getTableId()).readPage(pid);
+            this.cachedPages.put(pid, page);
+            return page;
         }
     }
 

@@ -1,6 +1,7 @@
 package simpledb;
 
 import java.io.*;
+import java.nio.Buffer;
 import java.util.*;
 
 /**
@@ -126,8 +127,73 @@ public class HeapFile implements DbFile {
 
     // see DbFile.java for javadocs
     public DbFileIterator iterator(TransactionId tid) {
-        // some code goes here
-        return null;
+        return new HeapFileIterator(tid);
+    }
+
+    private class HeapFileIterator implements DbFileIterator {
+
+        private final TransactionId tid;
+        private int tableId;
+        private int pageNo;
+        private Iterator<Tuple> pageIterator;
+        private PageId curPageId;
+        private BufferPool pool;
+        private Permissions perm;
+
+        HeapFileIterator(TransactionId tid) {
+            this.tid = tid;
+            this.pool = new BufferPool(BufferPool.DEFAULT_PAGES);
+            this.perm = Permissions.READ_ONLY;
+        }
+
+        @Override
+        public void open() throws DbException, TransactionAbortedException {
+            this.tableId = getId();
+            this.pageNo = 0;
+
+            this.curPageId = new HeapPageId(this.tableId, pageNo);
+            HeapPage curPage = (HeapPage) this.pool.getPage(this.tid, curPageId, this.perm);
+            this.pageIterator = curPage.iterator();
+        }
+
+        @Override
+        public boolean hasNext() throws DbException, TransactionAbortedException {
+            if (this.pageIterator.hasNext()) {
+                return true;
+            } else {
+                this.pageNo++;
+                if (this.pageNo < numPages()) {
+                    this.curPageId = new HeapPageId(this.tableId, pageNo);
+                    HeapPage curPage = (HeapPage) this.pool.getPage(this.tid, curPageId, this.perm);
+                    this.pageIterator = curPage.iterator();
+                    return this.pageIterator.hasNext();
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        @Override
+        public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
+            if (hasNext()) {
+                return this.pageIterator.next();
+            } else {
+                throw new NoSuchElementException("No more elements");
+            }
+        }
+
+        @Override
+        public void rewind() throws DbException, TransactionAbortedException {
+            this.pageNo = 0;
+
+            this.curPageId = new HeapPageId(this.tableId, pageNo);
+            HeapPage curPage = (HeapPage) this.pool.getPage(this.tid, curPageId, this.perm);
+            this.pageIterator = curPage.iterator();
+        }
+
+        @Override
+        public void close() {
+        }
     }
 
 }

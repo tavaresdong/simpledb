@@ -9,7 +9,7 @@ import java.io.*;
  * constructor is private.
  */
 public enum Type implements Serializable {
-    INT_TYPE() {
+    INT_TYPE {
         @Override
         public int getLen() {
             return 4;
@@ -24,10 +24,11 @@ public enum Type implements Serializable {
             }
         }
 
-    }, STRING_TYPE() {
+    },
+    STRING_TYPE {
         @Override
         public int getLen() {
-            return STRING_LEN+4;
+            return STRING_LEN + 4;
         }
 
         @Override
@@ -59,5 +60,4 @@ public enum Type implements Serializable {
    *   of the appropriate type.
    */
     public abstract Field parse(DataInputStream dis) throws ParseException;
-
 }

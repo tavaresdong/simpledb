@@ -9,10 +9,19 @@ sourceCompatibility = 1.8
 
 repositories {
     mavenCentral()
+    flatDir {
+        dirs 'lib'
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
 }
 
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
     testCompile group: 'com.querydsl', name: 'querydsl-sql', version: '4.0.3'
-    testCompile group: 'org.jline', name: 'jline', version: '3.1.3'
+    testCompile 'antlr:antlr:2.7.2'
+    compile 'org.jline:jline:0.9.94'
+    compile 'zql:zql'
 }

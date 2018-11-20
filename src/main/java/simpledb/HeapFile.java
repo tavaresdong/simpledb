@@ -177,7 +177,10 @@ public class HeapFile implements DbFile {
                     this.curPageId = new HeapPageId(this.tableId, pageNo);
                     HeapPage curPage = (HeapPage) this.pool.getPage(this.tid, curPageId, this.perm);
                     this.pageIterator = curPage.iterator();
-                    return this.pageIterator.hasNext();
+
+                    // Note: cannot call this.pageIterator.hasNext(), because there
+                    // could be one more empty page
+                    return hasNext();
                 } else {
                     return false;
                 }
@@ -187,7 +190,12 @@ public class HeapFile implements DbFile {
         @Override
         public Tuple next() throws DbException, TransactionAbortedException, NoSuchElementException {
             if (hasNext()) {
-                return this.pageIterator.next();
+                Tuple t = this.pageIterator.next();
+                if (t == null) {
+                    System.out.println("Null");
+                }
+
+                return t;
             } else {
                 throw new NoSuchElementException("No more elements");
             }

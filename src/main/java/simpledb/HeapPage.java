@@ -323,20 +323,26 @@ public class HeapPage implements Page {
 
             @Override
             public boolean hasNext() {
-                if (curIdx < tuples.length) {
-                    return true;
+                while (curIdx < tuples.length && !isSlotUsed(curIdx)) {
+                    ++curIdx;
                 }
 
-                return false;
+                if (curIdx == tuples.length) {
+                    return false;
+                }
+
+                return true;
             }
 
             @Override
             public Tuple next() {
-                Tuple toReturn = tuples[curIdx];
-                do {
+                if (hasNext()) {
+                    Tuple t = tuples[curIdx];
                     ++curIdx;
-                } while (curIdx < tuples.length && tuples[curIdx] == null);
-                return toReturn;
+                    return t;
+                } else {
+                    throw new NoSuchElementException("No more elements");
+                }
             }
         };
     }

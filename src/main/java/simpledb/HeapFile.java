@@ -1,5 +1,6 @@
 package simpledb;
 
+import javax.xml.crypto.Data;
 import java.io.*;
 import java.nio.Buffer;
 import java.util.*;
@@ -65,34 +66,20 @@ public class HeapFile implements DbFile {
 
     // see DbFile.java for javadocs
     public Page readPage(PageId pid) {
-        RandomAccessFile rf = null;
+        int pageno = pid.getPageNumber();
+        byte[] buffer = new byte[BufferPool.getPageSize()];
         try {
-            rf = new RandomAccessFile(this.file, "r");
-            int offset = pid.getPageNumber() * BufferPool.getPageSize() * 8;
-            rf.seek(offset);
-            byte[] pageData = new byte[BufferPool.getPageSize()];
-            rf.read(pageData);
-
-            HeapPageId hpid = new HeapPageId(pid.getTableId(), pid.getPageNumber());
-            Page p = new HeapPage(hpid, pageData);
-            return p;
-        }
-        catch (FileNotFoundException ex) {
-            ex.printStackTrace();
-            return null;
-        }
-        catch (IOException ex) {
-            ex.printStackTrace();
-            return null;
-        }
-        finally {
-            try {
-                if (rf != null) {
-                    rf.close();
-                }
-            } catch (IOException ex) {
-                ex.printStackTrace();
+            RandomAccessFile raf = new RandomAccessFile(this.file, "r");
+            raf.seek(BufferPool.getPageSize() * pageno);
+            int bytesread = raf.read(buffer);
+            raf.close();
+            if (bytesread == buffer.length) {
+                HeapPageId hpi = new HeapPageId(pid.getTableId(), pid.getPageNumber());
+                return new HeapPage(hpi, buffer);
             }
+            throw new RuntimeException("Could not read entire page");
+        } catch (IOException e) {
+            throw new IllegalArgumentException();
         }
     }
 
@@ -106,7 +93,7 @@ public class HeapFile implements DbFile {
      * Returns the number of pages in this HeapFile.
      */
     public int numPages() {
-        return (int) (this.file.length() / (long)BufferPool.getPageSize());
+        return (int) (this.file.length() / (long) BufferPool.getPageSize());
     }
 
     // see DbFile.java for javadocs
@@ -133,33 +120,23 @@ public class HeapFile implements DbFile {
     private class HeapFileIterator implements DbFileIterator {
         private boolean isOpen;
         private final TransactionId tid;
-        private int tableId;
         private int pageNo;
         private Iterator<Tuple> pageIterator;
         private PageId curPageId;
-        private BufferPool pool;
         private Permissions perm;
+        private int tableId;
 
         HeapFileIterator(TransactionId tid) {
             this.isOpen = false;
             this.tid = tid;
-            this.pool = new BufferPool(BufferPool.DEFAULT_PAGES);
             this.perm = Permissions.READ_ONLY;
+            this.tableId = getId();
         }
-
-        private void reset() throws DbException, TransactionAbortedException {
-            this.pageNo = 0;
-            this.curPageId = new HeapPageId(this.tableId, pageNo);
-            HeapPage curPage = (HeapPage) this.pool.getPage(this.tid, curPageId, this.perm);
-            this.pageIterator = curPage.iterator();
-        }
-
 
         @Override
         public void open() throws DbException, TransactionAbortedException {
-            this.tableId = getId();
             this.isOpen = true;
-            this.reset();
+            this.rewind();
         }
 
         @Override
@@ -175,7 +152,7 @@ public class HeapFile implements DbFile {
                 this.pageNo++;
                 if (this.pageNo < numPages()) {
                     this.curPageId = new HeapPageId(this.tableId, pageNo);
-                    HeapPage curPage = (HeapPage) this.pool.getPage(this.tid, curPageId, this.perm);
+                    HeapPage curPage = (HeapPage) Database.getBufferPool().getPage(this.tid, curPageId, this.perm);
                     this.pageIterator = curPage.iterator();
 
                     // Note: cannot call this.pageIterator.hasNext(), because there
@@ -203,7 +180,10 @@ public class HeapFile implements DbFile {
 
         @Override
         public void rewind() throws DbException, TransactionAbortedException {
-            this.reset();
+            this.pageNo = 0;
+            this.curPageId = new HeapPageId(this.tableId, pageNo);
+            HeapPage curPage = (HeapPage) Database.getBufferPool().getPage(this.tid, this.curPageId, this.perm);
+            this.pageIterator = curPage.iterator();
         }
 
         @Override

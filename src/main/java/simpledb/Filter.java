@@ -9,6 +9,9 @@ public class Filter extends Operator {
 
     private static final long serialVersionUID = 1L;
 
+    private Predicate pred;
+    private OpIterator[] children;
+
     /**
      * Constructor accepts a predicate to apply and a child operator to read
      * tuples to filter from.
@@ -19,30 +22,32 @@ public class Filter extends Operator {
      *            The child operator
      */
     public Filter(Predicate p, OpIterator child) {
-        // some code goes here
+        this.pred = p;
+        this.children = new OpIterator[1];
+        this.children[0] = child;
     }
 
     public Predicate getPredicate() {
-        // some code goes here
-        return null;
+        return this.pred;
     }
 
     public TupleDesc getTupleDesc() {
-        // some code goes here
-        return null;
+        return children[0].getTupleDesc();
     }
 
     public void open() throws DbException, NoSuchElementException,
             TransactionAbortedException {
-        // some code goes here
+        super.open();
+        this.children[0].open();
     }
 
     public void close() {
-        // some code goes here
+        super.close();
+        this.children[0].close();
     }
 
     public void rewind() throws DbException, TransactionAbortedException {
-        // some code goes here
+        this.children[0].rewind();
     }
 
     /**
@@ -57,18 +62,30 @@ public class Filter extends Operator {
     protected Tuple fetchNext() throws NoSuchElementException,
             TransactionAbortedException, DbException {
         // some code goes here
-        return null;
+        Tuple t = null;
+        try {
+            while (t == null) {
+                Tuple next = this.children[0].next();
+                if (this.pred.filter(next)) {
+                    t = next;
+                    break;
+                }
+            }
+        } catch (NoSuchElementException ex) {
+        }
+
+        // Return null if no more tuples
+        return t;
     }
 
     @Override
     public OpIterator[] getChildren() {
-        // some code goes here
-        return null;
+        return this.children;
     }
 
     @Override
     public void setChildren(OpIterator[] children) {
-        // some code goes here
+        this.children = children;
     }
 
 }

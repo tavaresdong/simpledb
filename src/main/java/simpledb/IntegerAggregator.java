@@ -1,6 +1,5 @@
 package simpledb;
 
-import javax.print.DocFlavor;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -8,7 +7,6 @@ import java.util.NoSuchElementException;
 
 import static simpledb.Aggregator.Op.MAX;
 import static simpledb.Aggregator.Op.MIN;
-import static simpledb.Aggregator.Op.SUM;
 
 /**
  * Knows how to compute some aggregate over a set of IntFields.
@@ -17,14 +15,15 @@ public class IntegerAggregator implements Aggregator {
 
     private static final long serialVersionUID = 1L;
 
-    private int gbField;
+    private int gbFieldIdx;
     private Type gbFieldType;
     private int aggField;
     private Op what;
 
-    private int count;
     private Map groupAggregates;
     private Map groupAggregatesCount;
+
+    private int count;
     private Integer noGroupAggregate;
 
     /**
@@ -43,12 +42,12 @@ public class IntegerAggregator implements Aggregator {
      */
 
     public IntegerAggregator(int gbfield, Type gbfieldtype, int afield, Op what) {
-        this.gbField = gbfield;
+        this.gbFieldIdx = gbfield;
         this.gbFieldType = gbfieldtype;
         this.aggField = afield;
         this.what = what;
-        this.count = 0;
 
+        this.count = 0;
         this.noGroupAggregate = 0;
         if (this.what == MAX) {
             this.noGroupAggregate = Integer.MIN_VALUE;
@@ -67,6 +66,52 @@ public class IntegerAggregator implements Aggregator {
         }
     }
 
+    private <T> void calculateAggregation(Tuple tup, T key, int value) {
+        Map<T, Integer> group = (Map<T, Integer>) this.groupAggregates;
+        Map<T, Integer> groupCount = (Map<T, Integer>) this.groupAggregatesCount;
+
+        switch (this.what) {
+            case SUM:
+            case AVG:
+                if (group.containsKey(key)) {
+                    group.put(key, group.get(key) + value);
+                    groupCount.put(key, groupCount.get(key) + 1);
+
+                } else {
+                    group.put(key, value);
+                    groupCount.put(key, 1);
+                }
+                break;
+            case MAX:
+                if (group.containsKey(key)) {
+                    group.put(key, Math.max(group.get(key), value));
+                    groupCount.put(key, groupCount.get(key) + 1);
+                } else {
+                    group.put(key, value);
+                    groupCount.put(key, 1);
+                }
+                break;
+            case MIN:
+                if (group.containsKey(key)) {
+                    group.put(key, Math.min(group.get(key), value));
+                    groupCount.put(key, groupCount.get(key) + 1);
+                } else {
+                    group.put(key, value);
+                    groupCount.put(key, 1);
+                }
+                break;
+            case COUNT:
+                if (group.containsKey(key)) {
+                    group.put(key, group.get(key) + 1);
+                    groupCount.put(key, groupCount.get(key) + 1);
+                } else {
+                    group.put(key, 1);
+                    groupCount.put(key, 1);
+                }
+                break;
+        }
+    }
+
     /**
      * Merge a new tuple into the aggregate, grouping as indicated in the
      * constructor
@@ -78,7 +123,7 @@ public class IntegerAggregator implements Aggregator {
         int value = ((IntField) tup.getField(this.aggField)).getValue();
 
         this.count++;
-        if (this.gbField == Aggregator.NO_GROUPING) {
+        if (this.gbFieldIdx == Aggregator.NO_GROUPING) {
             switch (this.what) {
                 case SUM:
                 case AVG:
@@ -95,98 +140,13 @@ public class IntegerAggregator implements Aggregator {
                     break;
             }
         } else {
-            String sKey = null;
-            Integer iKey = 0;
-            Field groupByFieldValue = tup.getField(this.gbField);
+            Field gbField = tup.getField(this.gbFieldIdx);
             if (this.gbFieldType == Type.INT_TYPE) {
-                iKey = ((IntField) groupByFieldValue).getValue();
-                Map<Integer, Integer> group = (Map<Integer, Integer>) this.groupAggregates;
-                Map<Integer, Integer> groupCount = (Map<Integer, Integer>) this.groupAggregatesCount;
-
-                switch (this.what) {
-                    case SUM:
-                    case AVG:
-                        if (group.containsKey(iKey)) {
-                            group.put(iKey, group.get(iKey) + value);
-                            groupCount.put(iKey, groupCount.get(iKey) + 1);
-
-                        } else {
-                            group.put(iKey, value);
-                            groupCount.put(iKey, 1);
-                        }
-                        break;
-                    case MAX:
-                        if (group.containsKey(iKey)) {
-                            group.put(iKey, Math.max(group.get(iKey), value));
-                            groupCount.put(iKey, groupCount.get(iKey) + 1);
-                        } else {
-                            group.put(iKey, value);
-                            groupCount.put(iKey, 1);
-                        }
-                        break;
-                    case MIN:
-                        if (group.containsKey(iKey)) {
-                            group.put(iKey, Math.min(group.get(iKey), value));
-                            groupCount.put(iKey, groupCount.get(iKey) + 1);
-                        } else {
-                            group.put(iKey, value);
-                            groupCount.put(iKey, 1);
-                        }
-                        break;
-                    case COUNT:
-                        if (group.containsKey(iKey)) {
-                            group.put(iKey, group.get((iKey) + 1));
-                            groupCount.put(iKey, groupCount.get(iKey) + 1);
-                        } else {
-                            group.put(iKey, 1);
-                            groupCount.put(iKey, 1);
-                        }
-                        break;
-                }
+                Integer key = ((IntField) gbField).getValue();
+                calculateAggregation(tup, key, value);
             } else if (this.gbFieldType == Type.STRING_TYPE){
-                sKey = ((StringField) groupByFieldValue).getValue();
-                Map<String, Integer> group = (Map<String, Integer>) this.groupAggregates;
-                Map<String, Integer> groupCount = (Map<String, Integer>) this.groupAggregatesCount;
-
-                switch (this.what) {
-                    case SUM:
-                    case AVG:
-                        if (group.containsKey(sKey)) {
-                            group.put(sKey, group.get(sKey) + value);
-                            groupCount.put(sKey, groupCount.get(sKey) + 1);
-                        } else {
-                            group.put(sKey, value);
-                            groupCount.put(sKey, 1);
-                        }
-                        break;
-                    case MAX:
-                        if (group.containsKey(sKey)) {
-                            group.put(sKey, Math.max(group.get(sKey), value));
-                            groupCount.put(sKey, groupCount.get(sKey) + 1);
-                        } else {
-                            group.put(sKey, value);
-                            groupCount.put(sKey, 1);
-                        }
-                        break;
-                    case MIN:
-                        if (group.containsKey(sKey)) {
-                            group.put(sKey, Math.min(group.get(sKey), value));
-                            groupCount.put(sKey, groupCount.get(sKey) + 1);
-                        } else {
-                            group.put(sKey, value);
-                            groupCount.put(sKey, 1);
-                        }
-                        break;
-                    case COUNT:
-                        if (group.containsKey(sKey)) {
-                            group.put(sKey, group.get((sKey) + 1));
-                            groupCount.put(sKey, groupCount.get(sKey) + 1);
-                        } else {
-                            group.put(sKey, 1);
-                            groupCount.put(sKey, 1);
-                        }
-                        break;
-                }
+                String key = ((StringField) gbField).getValue();
+                calculateAggregation(tup, key, value);
             }
         }
     }
@@ -200,7 +160,7 @@ public class IntegerAggregator implements Aggregator {
      *         the constructor.
      */
     public OpIterator iterator() {
-        return new IntegerAggIterator(this.gbField,
+        return new IntegerAggIterator(this.gbFieldIdx,
                 this.gbFieldType, this.what, this.count,
                 this.groupAggregates, this.groupAggregatesCount,
                 this.noGroupAggregate);

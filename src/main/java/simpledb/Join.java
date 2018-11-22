@@ -111,6 +111,8 @@ public class Join extends Operator {
         // Assume this.curLeft already have a solid value
         try {
             while (t == null && this.curLeft != null) {
+
+                // (Continue) Scanning the right table
                 while (right.hasNext()) {
                     Tuple r = right.next();
                     if (this.pred.filter(this.curLeft, r)) {
@@ -126,6 +128,8 @@ public class Join extends Operator {
                 }
             }
         } catch (NoSuchElementException ex) {
+            // Reach here when left.next() caused a NoSuchElementException
+            // Meaning we have exhausted the left table
         }
 
         return t;

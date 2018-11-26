@@ -5,9 +5,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
-import static simpledb.Aggregator.Op.MAX;
-import static simpledb.Aggregator.Op.MIN;
-
 /**
  * Knows how to compute some aggregate over a set of StringFields.
  */
